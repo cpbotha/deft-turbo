@@ -3,7 +3,7 @@
 deft-turbo is a fork of the Emacs package Deft, originally by Jason
 Blevins. See http://jblevins.org/projects/deft/
 
-This fork is by cpbotha@vxlabs.com
+This fork is by [http://charlbotha.com/](Charl P. Botha)
 
 ## Additional features
 
