@@ -596,7 +596,7 @@ is the complete regexp."
       (setq file (replace-regexp-in-string (concat "\." deft-extension "$") "" file)))
   file)
 
-(defun deft-find-all-files ()
+(defun deft-find-all-files-old ()
   "Return a list of all files in the Deft directory.
 
 It is important to note that the return value is a list of
@@ -616,6 +616,42 @@ tables should use `expand-file-name' on filenames first."
                      (not (file-directory-p file)))
             (setq result (cons file result))))
         result)))
+
+(defun deft-find-all-files (directory)
+  "List the deft-extension files in DIRECTORY and in its sub-directories."
+  ;; cpbotha found this on http://www.gnu.org/software/emacs/manual/html_node/eintr/Files-List.html
+  ;; and adapted for deft
+  (let (el-files-list
+        (current-directory-list
+         (directory-files-and-attributes directory t)))
+    ;; while we are in the current directory
+    (while current-directory-list
+      (cond
+       ;; check to see whether filename ends in `.deft-extension'
+       ;; and if so, append its name to a list.
+       ((equal (concat "\." deft-extension) (substring (car (car current-directory-list)) -3))
+        (setq el-files-list
+              (cons (car (car current-directory-list)) el-files-list)))
+       ;; check whether filename is that of a directory
+       ((eq t (car (cdr (car current-directory-list))))
+        ;; decide whether to skip or recurse
+        (if
+            (equal "."
+                   (substring (car (car current-directory-list)) -1))
+            ;; then do nothing since filename is that of
+            ;;   current directory or parent, "." or ".."
+            ()
+          ;; else descend into the directory and repeat the process
+          (setq el-files-list
+                (append
+                 (deft-find-all-files
+                  (car (car current-directory-list)))
+                 el-files-list)))))
+      ;; move to the next filename in the list; this also
+      ;; shortens the list so the while loop eventually comes to an end
+      (setq current-directory-list (cdr current-directory-list)))
+    ;; return the filenames
+    el-files-list))
 
 (defun deft-strip-title (title)
   "Remove all strings matching `deft-strip-title-regexp' from TITLE."
@@ -695,7 +731,7 @@ Case is ignored."
 
 (defun deft-cache-update-all ()
   "Update file list and update cached information for each file."
-  (setq deft-all-files (deft-find-all-files))             ; List all files
+  (setq deft-all-files (deft-find-all-files deft-directory)) ; List all files
   (mapc 'deft-cache-file deft-all-files)                  ; Cache contents
   (setq deft-all-files (deft-sort-files deft-all-files))) ; Sort by mtime
 
