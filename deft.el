@@ -3,6 +3,10 @@
 ;;; Copyright (C) 2011-2013 Jason R. Blevins <jrblevin@sdf.org>
 ;; All rights reserved.
 
+;; deft-turbo fork by Charl P. Botha <cpbotha@vxlabs.com>
+;; - recursive directory search
+;; - multiple extensions active, e.g. I use a mix of .org and .md
+
 ;; Redistribution and use in source and binary forms, with or without
 ;; modification, are permitted provided that the following conditions are met:
 ;; 1. Redistributions of source code must retain the above copyright
@@ -179,23 +183,9 @@
 ;; `M-x customize-group` and typing `deft`.  Alternatively, you can
 ;; configure them in your `.emacs` file:
 
-;;     (setq deft-extension "txt")
-;;     (setq deft-directory "~/Dropbox/notes")
-
-;; You can also customize the major mode that Deft uses to edit files,
-;; either through `M-x customize-group` or by adding something like
-;; the following to your `.emacs` file:
-
-;;     (setq deft-text-mode 'markdown-mode)
-
-;; Note that the mode need not be a traditional text mode.  If you
-;; prefer to write notes as LaTeX fragments, for example, you could
-;; set `deft-extension' to "tex" and `deft-text-mode' to `latex-mode'.
-
-;; If you prefer `org-mode', then simply use
-
-;;     (setq deft-extension "org")
-;;     (setq deft-text-mode 'org-mode)
+;;     (setq deft-extensions '("txt" "md")
+;;     (setq deft-default-extension "md")
+;;     (setq deft-directory "~/Dropbox/notes"))
 
 ;; For compatibility with other applications which take the title from
 ;; the filename, rather than from first line of the file, set the
@@ -217,12 +207,12 @@
 ;; Deft buffer directly.  Calling `deft-find-file' will prompt for a
 ;; file to open, just like `find-file', but starting from
 ;; `deft-directory'.  If the file selected is in `deft-directory', it
-;; is opened with the usual deft features (using `deft-text-mode',
-;; automatic saving, automatic updating of the Deft buffer, etc.).
-;; Otherwise, the file will be opened by `find-file' as usual.
-;; Therefore, you can set up a global keybinding for this function to
-;; open Deft files anywhere.  For example, to use `C-x C-g`, a
-;; neighbor of `C-x C-f`, use the following:
+;; is opened with the usual deft features (automatic saving, automatic
+;; updating of the Deft buffer, etc.).  Otherwise, the file will be
+;; opened by `find-file' as usual.  Therefore, you can set up a global
+;; keybinding for this function to open Deft files anywhere.  For
+;; example, to use `C-x C-g`, a neighbor of `C-x C-f`, use the
+;; following:
 
 ;;     (global-set-key (kbd "C-x C-g") 'deft-find-file)
 
@@ -322,15 +312,15 @@
   :safe 'stringp
   :group 'deft)
 
-(defcustom deft-extension "txt"
-  "Deft file extension."
-  :type 'string
-  :safe 'stringp
+(defcustom deft-extensions '("org" "md")
+  "Any files with these extensions will be listed."
+  :type '(repeat string)
   :group 'deft)
 
-(defcustom deft-text-mode 'text-mode
-  "Default mode used for editing files."
-  :type 'function
+(defcustom deft-default-extension "org"
+  "Newly created files will get this extension."
+  :type 'string
+  :safe 'stringp
   :group 'deft)
 
 (defcustom deft-auto-save-interval 1.0
@@ -591,34 +581,10 @@ is the complete regexp."
 
 (defun deft-base-filename (file)
   "Strip the path and extension from filename FILE."
-  (setq file (file-name-nondirectory file))
-  (if (> (length deft-extension) 0)
-      (setq file (replace-regexp-in-string (concat "\." deft-extension "$") "" file)))
-  file)
-
-(defun deft-find-all-files-old ()
-  "Return a list of all files in the Deft directory.
-
-It is important to note that the return value is a list of
-absolute filenames.  These absolute filenames are used as keys
-for the various hash tables used for storing file metadata and
-contents.  So, any functions looking up values in these hash
-tables should use `expand-file-name' on filenames first."
-  (if (file-exists-p deft-directory)
-      (let (files result)
-        ;; List all files
-        (setq files
-              (directory-files deft-directory t
-                               (concat "\." deft-extension "$") t))
-        ;; Filter out files that are not readable or are directories
-        (dolist (file files)
-          (when (and (file-readable-p file)
-                     (not (file-directory-p file)))
-            (setq result (cons file result))))
-        result)))
+  (file-name-base file))
 
 (defun deft-find-all-files (directory)
-  "List the deft-extension files in DIRECTORY and in its sub-directories."
+  "List the deft-extensions files in DIRECTORY and in its sub-directories."
   ;; cpbotha found this on http://www.gnu.org/software/emacs/manual/html_node/eintr/Files-List.html
   ;; and adapted for deft
   (let (el-files-list
@@ -627,9 +593,9 @@ tables should use `expand-file-name' on filenames first."
     ;; while we are in the current directory
     (while current-directory-list
       (cond
-       ;; check to see whether filename ends in `.deft-extension'
+       ;; check to see whether filename ends with an extension that's listed in deft-extensions
        ;; and if so, append its name to a list.
-       ((equal (concat "\." deft-extension) (substring (car (car current-directory-list)) -3))
+       ((member (file-name-extension (car (car current-directory-list))) deft-extensions)
         (setq el-files-list
               (cons (car (car current-directory-list)) el-files-list)))
        ;; check whether filename is that of a directory
@@ -881,9 +847,9 @@ Call this function after any actions which update the filter and file list."
 
 (defun deft-absolute-filename (slug &optional extension)
   "Return an absolute filename to file named SLUG with optional EXTENSION.
-If EXTENSION is not given, `deft-extension' is assumed."
+If EXTENSION is not given, `deft-default-extension' is assumed."
   (concat (file-name-as-directory (expand-file-name deft-directory))
-          slug "." (or extension deft-extension)))
+          slug "." (or extension deft-default-extension)))
 
 (defun deft-unused-slug ()
   "Return an unused filename slug (short name) in `deft-directory'."
@@ -903,9 +869,7 @@ If EXTENSION is not given, `deft-extension' is assumed."
     (when buffer
       (with-current-buffer (get-file-buffer old)
         (set-visited-file-name new nil t)
-        (when (not (eq major-mode deft-text-mode))
-          (funcall deft-text-mode)
-          (hack-local-variables))))))
+        (hack-local-variables)))))
 
 (defun deft-open-file (file &optional other switch)
   "Open FILE in a new buffer and setting its mode.
@@ -914,10 +878,7 @@ OTHER and SWITCH are both non-nil, switch to the other window.
 FILE must be a relative or absolute path, with extension."
   (let ((buffer (find-file-noselect file)))
     (with-current-buffer buffer
-      ;; Set the mode and search forward for the filter string
-      (when (not (eq major-mode deft-text-mode))
-        (funcall deft-text-mode)
-        (hack-local-variables))
+      (hack-local-variables)
       (when deft-filter-regexp
         (goto-char (point-min))
         (re-search-forward (deft-filter-regexp-as-regexp) nil t))
@@ -1020,7 +981,7 @@ If the point is not on a file widget, do nothing."
                       old-name))
       (setq new-filename
             (concat (file-name-as-directory deft-directory)
-                    new-name "." deft-extension))
+                    new-name "." deft-default-extension))
       (rename-file old-filename new-filename)
       (deft-update-visiting-buffers old-filename new-filename)
       (deft-refresh))))
