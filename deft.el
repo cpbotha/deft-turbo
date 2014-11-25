@@ -597,8 +597,10 @@ is the complete regexp."
     (while current-directory-list
       (cond
        ;; check to see whether filename ends with an extension that's listed in deft-extensions
+       ;; and that it's actually readable
        ;; and if so, append its name to a list.
-       ((member (file-name-extension (car (car current-directory-list))) deft-extensions)
+       ((and (member (file-name-extension (car (car current-directory-list))) deft-extensions)
+             (file-readable-p (car (car current-directory-list))))
         (setq el-files-list
               (cons (car (car current-directory-list)) el-files-list)))
        ;; check whether filename is that of a directory
