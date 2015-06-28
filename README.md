@@ -1,3 +1,9 @@
+# IMPORTANT NOTICE
+
+Jason Blevins, the author of Deft, is now on github, and has implemented both recursive directory listing and multiple file extensions in upstream Deft. This means that this fork is not necessary anymore!
+
+Deft proper can be found at: https://github.com/jrblevin/deft
+
 # deft-turbo
 
 deft-turbo is a fork of the Emacs package Deft, originally by Jason
